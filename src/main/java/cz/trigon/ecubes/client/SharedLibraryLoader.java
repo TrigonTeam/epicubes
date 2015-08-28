@@ -1,4 +1,4 @@
-package cz.trigon.ecubes;
+package cz.trigon.ecubes.client;
 /*******************************************************************************
  * Copyright 2011 See AUTHORS file.
  *

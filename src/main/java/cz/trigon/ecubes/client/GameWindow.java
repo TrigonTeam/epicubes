@@ -1,4 +1,4 @@
-package cz.trigon.ecubes;
+package cz.trigon.ecubes.client;
 
 import org.lwjgl.Sys;
 import org.lwjgl.glfw.Callbacks;
