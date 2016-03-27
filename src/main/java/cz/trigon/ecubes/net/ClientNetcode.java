@@ -125,6 +125,7 @@ public class ClientNetcode extends Listener {
         if (o instanceof byte[]) {
             byte[] dataCompressed = (byte[]) o;
             this.toProcessIncoming.add(new IncomingPacketBlob(connection, dataCompressed));
+            System.out.println("Received shat");
         }
     }
 

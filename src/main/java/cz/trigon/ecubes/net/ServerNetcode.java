@@ -10,6 +10,7 @@ import org.xerial.snappy.Snappy;
 import java.io.IOException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Consumer;
 
 public class ServerNetcode extends Listener {
 
@@ -18,10 +19,11 @@ public class ServerNetcode extends Listener {
     private Queue<OutgoingPacketBlob> toProcessOutgoing = new ConcurrentLinkedQueue<>();
 
     private Server server;
+    private Thread ip, op;
 
     public ServerNetcode(int tcp, int udp) throws IOException {
-        Thread ip = new Thread(this::processIncoming);
-        Thread op = new Thread(this::processOutgoing);
+        this.ip = new Thread(this::processIncoming);
+        this.op = new Thread(this::processOutgoing);
 
         this.server = new Server();
         this.server.start();
@@ -29,8 +31,14 @@ public class ServerNetcode extends Listener {
         this.server.bind(tcp, udp);
         this.server.addListener(this);
 
-        ip.start();
-        op.start();
+        this.ip.start();
+        this.op.start();
+    }
+
+    public void stop() {
+        this.ip.interrupt();
+        this.op.interrupt();
+        this.server.stop();
     }
 
     @Override
@@ -49,13 +57,23 @@ public class ServerNetcode extends Listener {
         return this.processedIncoming;
     }
 
-    public void sendPacketUdp(int clientId, Packet packet) {
-        this.toProcessOutgoing.add(new OutgoingPacketBlob(clientId, packet, false));
+    public void sendPacket(int clientId, Packet packet, boolean tcp) {
+        this.toProcessOutgoing.add(new OutgoingPacketBlob(clientId, packet, tcp));
     }
 
-    public void sendPacketTcp(int clientId, Packet packet) {
-        this.toProcessOutgoing.add(new OutgoingPacketBlob(clientId, packet, true));
+    public void sendPacketToAll(Packet packet, boolean tcp) {
+        for(Connection c : this.server.getConnections()) {
+            this.sendPacket(c.getID(), packet, tcp);
+        }
     }
+
+    public void sendPacketToAllExcept(int exceptClientId, Packet packet, boolean tcp) {
+        for(Connection c : this.server.getConnections()) {
+            if(c.getID() != exceptClientId)
+                this.sendPacket(c.getID(), packet, tcp);
+        }
+    }
+
 
     private void processOutgoing() {
         OutgoingPacketBlob b;

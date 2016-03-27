@@ -1,14 +1,20 @@
 package cz.trigon.ecubes.client;
 
-import org.lwjgl.Sys;
-import org.lwjgl.glfw.Callbacks;
+import cz.trigon.ecubes.net.ClientNetcode;
+import cz.trigon.ecubes.net.packet.Packet;
+import cz.trigon.ecubes.net.packet.PacketDrawTest;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
-import org.lwjgl.glfw.GLFWvidmode;
+import org.lwjgl.glfw.GLFWVidMode;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GLContext;
 
-import java.nio.ByteBuffer;
+import java.io.IOException;
+import java.nio.DoubleBuffer;
+import java.util.ArrayList;
+import java.util.List;
+
 
 public class GameWindow implements Runnable {
 
@@ -27,12 +33,46 @@ public class GameWindow implements Runnable {
         this.shutdownCode = code;
     }
 
-    private void renderTick(float ptt) {
+    private List<short[]> points = new ArrayList<>();
+    private List<int[]> localPoints = new ArrayList<>();
 
+    private ClientNetcode client;
+
+    private void renderTick(float ptt) {
+        int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_1);
+        if(mouse == 1) {
+            DoubleBuffer xpos = BufferUtils.createDoubleBuffer(1);
+            DoubleBuffer ypos = BufferUtils.createDoubleBuffer(1);
+            GLFW.glfwGetCursorPos(this.windowHandle, xpos, ypos);
+
+            this.localPoints.add(new int[] {(int)xpos.get(0), (int)ypos.get(0)});
+            PacketDrawTest d = new PacketDrawTest((short) xpos.get(0), (short) ypos.get(0));
+            this.client.sendPacketUdp(d);
+            System.out.println("Sent: " + d.x + ":" + d.y);
+        }
+
+        GL11.glPointSize(5f);
+
+        GL11.glBegin(GL11.GL_POINTS);
+        GL11.glColor3f(0, 1f, 0);
+        for(int[] pn : this.localPoints) {
+            GL11.glVertex2f(pn[0], pn[1]);
+        }
+
+        GL11.glColor3f(1f, 1f, 1f);
+        for(short[] pn : this.points) {
+            GL11.glVertex2f(pn[0], pn[1]);
+        }
+        GL11.glEnd();
     }
 
     private void tick() {
-
+        Packet p;
+        while((p = this.client.getProcessedPackets().poll()) != null) {
+            PacketDrawTest d = ((PacketDrawTest)p);
+            System.out.println("Polled: " + d.x + ":" + d.y);
+            this.points.add(new short[] {d.x, d.y});
+        }
     }
 
     private void fpsCount() {
@@ -61,12 +101,15 @@ public class GameWindow implements Runnable {
     }
 
     public void loop() {
+        GL.createCapabilities();
+        this.testInit();
+
         this.time = System.nanoTime();
         this.lastTime = time;
         this.lastInfo = time;
 
         while (GLFW.glfwWindowShouldClose(this.windowHandle) == GL11.GL_FALSE) {
-            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT);
+            GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
             this.loopTick();
             GLFW.glfwSwapBuffers(this.windowHandle);
             GLFW.glfwPollEvents();
@@ -77,8 +120,7 @@ public class GameWindow implements Runnable {
     }
 
     private void init() {
-        GLFW.glfwSetErrorCallback(this.errorCallback = Callbacks
-                .errorCallbackPrint(System.err));
+        GLFW.glfwSetErrorCallback(this.errorCallback = GLFWErrorCallback.createPrint(System.err));
 
         if (GLFW.glfwInit() != GL11.GL_TRUE) {
             throw new RuntimeException("Couldn't init GLFW.");
@@ -94,9 +136,29 @@ public class GameWindow implements Runnable {
             throw new RuntimeException("Couldn't create window.");
         }
 
+
         GLFW.glfwHideWindow(this.windowHandle);
         this.resize(800, 600);
         GLFW.glfwShowWindow(this.windowHandle);
+    }
+
+    private void testInit() {
+        try {
+            this.client = new ClientNetcode("127.0.0.1", 6927, 6928);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        GL11.glViewport(0, 0, width, height);
+
+        GL11.glMatrixMode(GL11.GL_PROJECTION);
+        GL11.glLoadIdentity();
+        GL11.glOrtho(0, width, height, 0, 0, 1);
+        GL11.glMatrixMode(GL11.GL_MODELVIEW);
+
+        GL11.glDisable(GL11.GL_LIGHTING);
+        GL11.glDisable(GL11.GL_CULL_FACE);
+        GL11.glDisable(GL11.GL_DEPTH_TEST);
     }
 
     private void cleanup() {
@@ -107,18 +169,14 @@ public class GameWindow implements Runnable {
         this.width = width;
         this.height = height;
 
-        ByteBuffer vidmode = GLFW
-                .glfwGetVideoMode(GLFW.glfwGetPrimaryMonitor());
+        GLFWVidMode vidmode = GLFW.glfwGetVideoMode(GLFW.glfwGetPrimaryMonitor());
 
         GLFW.glfwSetWindowPos(this.windowHandle,
-                (GLFWvidmode.width(vidmode) - width) / 2,
-                (GLFWvidmode.height(vidmode) - height) / 2);
+                (vidmode.width() - width) / 2,
+                (vidmode.height() - height) / 2);
 
         GLFW.glfwMakeContextCurrent(this.windowHandle);
         GLFW.glfwSwapInterval(0);
-        GLContext.createFromCurrent();
-
-        GL11.glViewport(0, 0, width, height);
     }
 
     @Override

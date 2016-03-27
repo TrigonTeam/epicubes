@@ -9,7 +9,7 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <lwjgl.version>3.0.0a</lwjgl.version>
+        <lwjgl.version>3.0.0b</lwjgl.version>
     </properties>
 
     <build>

@@ -6,8 +6,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class PacketRegister {
-    private static Map<Short, Class<? extends Packet>> packets = new HashMap<>();
-    private static Map<Class<? extends Packet>, Short> pids = new HashMap<>();
+    static {
+        PacketRegister.packets = new HashMap<>();
+        PacketRegister.pids = new HashMap<>();
+        PacketRegister.registerPacket(PacketDrawTest.class, (short) 6);
+    }
+
+    private static Map<Short, Class<? extends Packet>> packets;
+    private static Map<Class<? extends Packet>, Short> pids;
 
     public static void registerPacket(Class<? extends Packet> packet, short id) {
         if(!PacketRegister.packets.containsKey(id)) {
@@ -36,5 +42,7 @@ public class PacketRegister {
         } else {
             return null;
         }
-    }
+    }/*
+        return new PacketDrawTest(connection);
+    }*/
 }
