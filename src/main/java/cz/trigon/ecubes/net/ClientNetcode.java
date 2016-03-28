@@ -3,7 +3,9 @@ package cz.trigon.ecubes.net;
 import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
+import cz.trigon.ecubes.client.GameWindow;
 import cz.trigon.ecubes.net.packet.Packet;
+import cz.trigon.ecubes.net.packet.PacketDrawTest;
 import cz.trigon.ecubes.net.packet.PacketRegister;
 import org.xerial.snappy.Snappy;
 
@@ -125,7 +127,6 @@ public class ClientNetcode extends Listener {
         if (o instanceof byte[]) {
             byte[] dataCompressed = (byte[]) o;
             this.toProcessIncoming.add(new IncomingPacketBlob(connection, dataCompressed));
-            System.out.println("Received shat");
         }
     }
 

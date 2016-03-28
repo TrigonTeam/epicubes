@@ -38,6 +38,9 @@ public class GameWindow implements Runnable {
 
     private ClientNetcode client;
 
+    int num = 1;
+    float timePacket;
+
     private void renderTick(float ptt) {
         int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_1);
         if(mouse == 1) {
@@ -47,6 +50,7 @@ public class GameWindow implements Runnable {
 
             this.localPoints.add(new int[] {(int)xpos.get(0), (int)ypos.get(0)});
             PacketDrawTest d = new PacketDrawTest((short) xpos.get(0), (short) ypos.get(0));
+            d.timeSent = System.nanoTime();
             this.client.sendPacketUdp(d);
             System.out.println("Sent: " + d.x + ":" + d.y);
         }
@@ -70,7 +74,10 @@ public class GameWindow implements Runnable {
         Packet p;
         while((p = this.client.getProcessedPackets().poll()) != null) {
             PacketDrawTest d = ((PacketDrawTest)p);
-            System.out.println("Polled: " + d.x + ":" + d.y);
+            float time = (System.nanoTime() - d.timeSent) / 1000000000f;
+            this.timePacket += time;
+            this.num++;
+            System.out.println("Time: " + time + " s");
             this.points.add(new short[] {d.x, d.y});
         }
     }
@@ -116,6 +123,7 @@ public class GameWindow implements Runnable {
         }
 
         this.cleanup();
+        System.out.println("Avg packet time: " + (this.timePacket / (this.num + 1)) + " ms");
         System.exit(this.shutdownCode);
     }
 
