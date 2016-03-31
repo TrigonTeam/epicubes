@@ -21,17 +21,13 @@ public class GameWindow implements Runnable {
     private long windowHandle;
     private GLFWErrorCallback errorCallback;
     private int width, height;
-    protected int tps = 20, magicConstant = 1000000000;
-    protected double tickTime = 1d / tps;
-    protected double tickTimeSec = this.tickTime * this.magicConstant;
-    protected long time, lastTime, lastInfo;
-    protected int fps, ticks, lastTicks;
+    private int tps = 20, magicConstant = 1000000000;
+    private double tickTime = 1d / tps;
+    private double tickTimeSec = this.tickTime * this.magicConstant;
+    private long time, lastTime, lastInfo;
+    private int fps, ticks, lastTicks;
     private int shutdownCode;
-
-    public void shutdown(int code) {
-        GLFW.glfwSetWindowShouldClose(this.windowHandle, GL11.GL_TRUE);
-        this.shutdownCode = code;
-    }
+    private Random rnd = new Random();
 
     private List<short[]> points = new ArrayList<>();
     private List<int[]> localPoints = new ArrayList<>();
@@ -39,11 +35,9 @@ public class GameWindow implements Runnable {
     private ClientNetcode client;
     private byte r, g, b;
 
-    private int x0, y0, x1, y1;
-
     private void renderTick(float ptt) {
         int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_1);
-        if(mouse == 1) {
+        if (mouse == 1) {
             DoubleBuffer xpos = BufferUtils.createDoubleBuffer(1);
             DoubleBuffer ypos = BufferUtils.createDoubleBuffer(1);
             GLFW.glfwGetCursorPos(this.windowHandle, xpos, ypos);
@@ -52,8 +46,8 @@ public class GameWindow implements Runnable {
             short x = (short) xpos.get(0);
             short y = (short) ypos.get(0);
 
-            if(i == null || !(i[0] == x && i[1] == y)) {
-                this.localPoints.add(new int[] { x, y });
+            if (i == null || !(i[0] == x && i[1] == y)) {
+                this.localPoints.add(new int[]{x, y});
                 PacketDrawTest d = new PacketDrawTest(x, y, this.r, this.g, this.b);
 
                 this.client.sendPacket(d, false);
@@ -64,60 +58,82 @@ public class GameWindow implements Runnable {
 
         GL11.glBegin(GL11.GL_POINTS);
         GL11.glColor3f(0, 1f, 0);
-        for(int[] pn : this.localPoints) {
+        for (int[] pn : this.localPoints) {
             GL11.glVertex2f(pn[0], pn[1]);
         }
 
-        for(short[] pn : this.points) {
+        for (short[] pn : this.points) {
             GL11.glColor3f(pn[2] / 255f, pn[3] / 255f, pn[4] / 255f);
             GL11.glVertex2f(pn[0], pn[1]);
         }
 
         GL11.glEnd();
-        GL11.glColor3f(1f, 0, 0);
-        GL11.glBegin(GL11.GL_QUADS);
-        GL11.glVertex2f(x0, y0);
-        GL11.glVertex2f(x1, y0);
-        GL11.glVertex2f(x1, y1);
-        GL11.glVertex2f(x0, y1);
-        GL11.glEnd();
     }
 
     private void tick() {
-        int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_3);
-        if(mouse == 1) {
-            this.client.sendPacket(new PacketCommand(0xAA), true);
-        }
+        this.handleControls();
 
-        Packet p;
-        while((p = this.client.getProcessedPackets().poll()) != null) {
-            if(p instanceof PacketDrawTest) {
-                PacketDrawTest d = ((PacketDrawTest) p);
-                this.points.add(new short[]{d.x, d.y, (short) (d.r + 127), (short) (d.g + 127), (short) (d.b + 127) });
-            } else if(p instanceof PacketMeasurePing) {
-                System.out.println("Ping: " + ((PacketMeasurePing) p).getPing() + " ms");
-            } else if(p instanceof PacketHistory) {
-                this.points.addAll(((PacketHistory) p).getHistory());
-            }
-        }
-
-        if(this.ticks % 100 == 0) {
+        if (this.ticks % 100 == 0) {
             this.client.sendPacket(new PacketMeasurePing(), true);
         }
 
-        if(GLFW.glfwGetKey(this.windowHandle, GLFW.GLFW_KEY_H) == GLFW.GLFW_PRESS) {
-            this.points.clear();
+        Packet p;
+        while ((p = this.client.getProcessedPackets().poll()) != null) {
+            if (p.getId() == 100) {
+                PacketDrawTest d = ((PacketDrawTest) p);
+                this.points.add(new short[]{d.x, d.y, (short) (d.r + 127), (short) (d.g + 127), (short) (d.b + 127)});
+            } else if (p.getId() == 101) {
+                PacketHistory h = (PacketHistory) p;
+                this.points.addAll(h.getHistory());
+            } else if (p.getId() == 1) {
+                System.out.println("Ping: " + ((PacketMeasurePing) p).getPing() + " ms");
+            } else if (p.getId() == 2) {
+                PacketCommand cmd = (PacketCommand) p;
 
-            for(int x = 0; x < this.width; x += 100) {
-                for(int y = 0; y < this.height; y += 100) {
-                    this.client.sendPacket(new PacketHistory((short) x, (short) y), true);
+                if(cmd.getCommand() == 0xBA) {
+                    // 0xBA - reload history
+                    this.loadHistory();
                 }
             }
         }
     }
 
-    private void fpsCount() {
-        GLFW.glfwSetWindowTitle(this.windowHandle, "EpiCubes - " + this.fps + " FPS");
+    private void handleControls() {
+        if (GLFW.glfwGetKey(this.windowHandle, GLFW.GLFW_KEY_H) == GLFW.GLFW_PRESS) {
+            this.loadHistory();
+        }
+
+        if (GLFW.glfwGetKey(this.windowHandle, GLFW.GLFW_KEY_C) == GLFW.GLFW_PRESS) {
+            // 0xAB - clear canvas
+            this.client.sendPacket(new PacketCommand(0xAB), true);
+            this.loadHistory();
+        }
+
+        if (GLFW.glfwGetKey(this.windowHandle, GLFW.GLFW_KEY_V) == GLFW.GLFW_PRESS) {
+            this.localPoints.clear();
+        }
+
+        if (GLFW.glfwGetKey(this.windowHandle, GLFW.GLFW_KEY_F) == GLFW.GLFW_PRESS) {
+            // 0xAA - fill canvas
+            this.client.sendPacket(new PacketCommand(0xAA), true);
+        }
+
+        int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_2);
+        if (mouse == 1) {
+            this.r = (byte) (127 - rnd.nextInt(256));
+            this.g = (byte) (127 - rnd.nextInt(256));
+            this.b = (byte) (127 - rnd.nextInt(256));
+        }
+    }
+
+    private void loadHistory() {
+        this.points.clear();
+
+        for (int x = 0; x < this.width; x += 100) {
+            for (int y = 0; y < this.height; y += 100) {
+                this.client.sendPacket(new PacketHistory((short) x, (short) y), true);
+            }
+        }
     }
 
     private void loopTick() {
@@ -190,7 +206,6 @@ public class GameWindow implements Runnable {
             e.printStackTrace();
         }
 
-        Random rnd = new Random();
         this.r = (byte) (127 - rnd.nextInt(256));
         this.g = (byte) (127 - rnd.nextInt(256));
         this.b = (byte) (127 - rnd.nextInt(256));
@@ -205,6 +220,10 @@ public class GameWindow implements Runnable {
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_CULL_FACE);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
+    }
+
+    private void fpsCount() {
+        GLFW.glfwSetWindowTitle(this.windowHandle, "EpiCubes - " + this.fps + " FPS");
     }
 
     private void cleanup() {
@@ -223,6 +242,11 @@ public class GameWindow implements Runnable {
 
         GLFW.glfwMakeContextCurrent(this.windowHandle);
         GLFW.glfwSwapInterval(0);
+    }
+
+    public void shutdown(int code) {
+        GLFW.glfwSetWindowShouldClose(this.windowHandle, GL11.GL_TRUE);
+        this.shutdownCode = code;
     }
 
     @Override

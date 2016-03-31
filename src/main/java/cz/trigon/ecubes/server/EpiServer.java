@@ -39,9 +39,15 @@ public class EpiServer implements Runnable {
                             this.points.add(new short[] { x, y, 255, 255, 255 });
                         }
                     }
+
+                    this.server.sendPacketToAll(new PacketCommand(0xBA), true);
+                } else if(cmd.getCommand() == 0xAB) {
+                    this.points.clear();
+                    this.server.sendPacketToAll(new PacketCommand(0xBA), true);
                 }
             } else if (p.getId() == 100) {
                 PacketDrawTest d = (PacketDrawTest) p;
+
                 this.points.add(new short[]{d.x, d.y, d.r, d.g, d.b});
                 this.server.sendPacketToAll(p, false);
             } else if (p.getId() == 101) {
