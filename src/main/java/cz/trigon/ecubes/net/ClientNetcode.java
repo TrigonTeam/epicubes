@@ -24,7 +24,7 @@ public class ClientNetcode extends Listener {
     public ClientNetcode(String address, int tcp, int udp) throws IOException {
         this.processing = new Thread(this::process);
 
-        this.client = new Client();
+        this.client = new Client(64000, 64000);
         this.client.start();
         this.client.getKryo().register(byte[].class);
         this.client.connect(5000, address, tcp, udp);

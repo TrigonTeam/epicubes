@@ -1,9 +1,7 @@
 package cz.trigon.ecubes.client;
 
 import cz.trigon.ecubes.net.ClientNetcode;
-import cz.trigon.ecubes.net.packet.Packet;
-import cz.trigon.ecubes.net.packet.PacketDrawTest;
-import cz.trigon.ecubes.net.packet.PacketTest;
+import cz.trigon.ecubes.net.packet.*;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
@@ -41,27 +39,24 @@ public class GameWindow implements Runnable {
     private ClientNetcode client;
     private byte r, g, b;
 
+    private int x0, y0, x1, y1;
+
     private void renderTick(float ptt) {
         int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_1);
-
         if(mouse == 1) {
             DoubleBuffer xpos = BufferUtils.createDoubleBuffer(1);
             DoubleBuffer ypos = BufferUtils.createDoubleBuffer(1);
             GLFW.glfwGetCursorPos(this.windowHandle, xpos, ypos);
 
-            short[] i = this.points.get(this.points.size() - 1);
+            int[] i = this.localPoints.size() > 0 ? this.localPoints.get(this.localPoints.size() - 1) : null;
             short x = (short) xpos.get(0);
             short y = (short) ypos.get(0);
 
-            if(i != null && !(i[0] == x && i[1] == y)) {
+            if(i == null || !(i[0] == x && i[1] == y)) {
                 this.localPoints.add(new int[] { x, y });
-
                 PacketDrawTest d = new PacketDrawTest(x, y, this.r, this.g, this.b);
 
                 this.client.sendPacket(d, false);
-                this.client.sendPacket(new PacketTest(), false);
-
-                System.out.println("Sent: " + d.x + ":" + d.y);
             }
         }
 
@@ -77,16 +72,46 @@ public class GameWindow implements Runnable {
             GL11.glColor3f(pn[2] / 255f, pn[3] / 255f, pn[4] / 255f);
             GL11.glVertex2f(pn[0], pn[1]);
         }
+
+        GL11.glEnd();
+        GL11.glColor3f(1f, 0, 0);
+        GL11.glBegin(GL11.GL_QUADS);
+        GL11.glVertex2f(x0, y0);
+        GL11.glVertex2f(x1, y0);
+        GL11.glVertex2f(x1, y1);
+        GL11.glVertex2f(x0, y1);
         GL11.glEnd();
     }
 
     private void tick() {
-        Packet p;
+        int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_3);
+        if(mouse == 1) {
+            this.client.sendPacket(new PacketCommand(0xAA), true);
+        }
 
+        Packet p;
         while((p = this.client.getProcessedPackets().poll()) != null) {
             if(p instanceof PacketDrawTest) {
                 PacketDrawTest d = ((PacketDrawTest) p);
                 this.points.add(new short[]{d.x, d.y, (short) (d.r + 127), (short) (d.g + 127), (short) (d.b + 127) });
+            } else if(p instanceof PacketMeasurePing) {
+                System.out.println("Ping: " + ((PacketMeasurePing) p).getPing() + " ms");
+            } else if(p instanceof PacketHistory) {
+                this.points.addAll(((PacketHistory) p).getHistory());
+            }
+        }
+
+        if(this.ticks % 100 == 0) {
+            this.client.sendPacket(new PacketMeasurePing(), true);
+        }
+
+        if(GLFW.glfwGetKey(this.windowHandle, GLFW.GLFW_KEY_H) == GLFW.GLFW_PRESS) {
+            this.points.clear();
+
+            for(int x = 0; x < this.width; x += 100) {
+                for(int y = 0; y < this.height; y += 100) {
+                    this.client.sendPacket(new PacketHistory((short) x, (short) y), true);
+                }
             }
         }
     }
@@ -169,8 +194,6 @@ public class GameWindow implements Runnable {
         this.r = (byte) (127 - rnd.nextInt(256));
         this.g = (byte) (127 - rnd.nextInt(256));
         this.b = (byte) (127 - rnd.nextInt(256));
-
-        this.points.add(0, new short[7]);
 
         GL11.glViewport(0, 0, width, height);
 

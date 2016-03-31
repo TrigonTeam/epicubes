@@ -8,16 +8,23 @@ public abstract class Packet {
     protected boolean enabledTcp = true;
     protected boolean enabledUdp = true;
     protected final boolean received;
+    private int id;
 
     protected Connection connection;
 
     public Packet() {
         this.received = false;
+        this.id = PacketRegister.getPacketId(this.getClass());
     }
 
     public Packet(Connection connection) {
         this.connection = connection;
         this.received = true;
+        this.id = PacketRegister.getPacketId(this.getClass());
+    }
+
+    public int getId() {
+        return this.id;
     }
 
     public Connection getConnection() {

@@ -24,7 +24,7 @@ public class ServerNetcode extends Listener {
     public ServerNetcode(int tcp, int udp) throws IOException {
         this.processing = new Thread(this::process);
 
-        this.server = new Server();
+        this.server = new Server(64000, 64000);
         this.server.start();
         this.server.getKryo().register(byte[].class);
         this.server.bind(tcp, udp);
@@ -88,7 +88,9 @@ public class ServerNetcode extends Listener {
 
                 byte[] bytes = b.packet.processOutgoing(true);
                 if (bytes.length >= 128) {
+                    System.out.println("Previous size: " + bytes.length);
                     bytes = Snappy.compress(bytes);
+                    System.out.println("Compressed size: " + bytes.length);
                     ids |= 1;
                 }
 

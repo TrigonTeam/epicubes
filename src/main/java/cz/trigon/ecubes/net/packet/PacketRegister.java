@@ -10,8 +10,11 @@ public class PacketRegister {
         PacketRegister.packets = new HashMap<>();
         PacketRegister.pids = new HashMap<>();
 
-        PacketRegister.registerPacket(PacketDrawTest.class, (short) 6);
-        PacketRegister.registerPacket(PacketTest.class, (short) 4);
+        PacketRegister.registerPacket(PacketDrawTest.class, (short) 100);
+        PacketRegister.registerPacket(PacketHistory.class, (short) 101);
+
+        PacketRegister.registerPacket(PacketMeasurePing.class, (short) 1);
+        PacketRegister.registerPacket(PacketCommand.class, (short) 2);
     }
 
     private static Map<Short, Class<? extends Packet>> packets;
