@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.nio.DoubleBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 
 public class GameWindow implements Runnable {
@@ -38,20 +39,30 @@ public class GameWindow implements Runnable {
     private List<int[]> localPoints = new ArrayList<>();
 
     private ClientNetcode client;
+    private byte r, g, b;
 
     private void renderTick(float ptt) {
         int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_1);
+
         if(mouse == 1) {
             DoubleBuffer xpos = BufferUtils.createDoubleBuffer(1);
             DoubleBuffer ypos = BufferUtils.createDoubleBuffer(1);
             GLFW.glfwGetCursorPos(this.windowHandle, xpos, ypos);
-            this.localPoints.add(new int[] {(int)xpos.get(0), (int)ypos.get(0)});
 
-            PacketDrawTest d = new PacketDrawTest((short) xpos.get(0), (short) ypos.get(0));
-            this.client.sendPacket(d, false);
-            this.client.sendPacket(new PacketTest(), false);
+            short[] i = this.points.get(this.points.size() - 1);
+            short x = (short) xpos.get(0);
+            short y = (short) ypos.get(0);
 
-            System.out.println("Sent: " + d.x + ":" + d.y);
+            if(i != null && !(i[0] == x && i[1] == y)) {
+                this.localPoints.add(new int[] { x, y });
+
+                PacketDrawTest d = new PacketDrawTest(x, y, this.r, this.g, this.b);
+
+                this.client.sendPacket(d, false);
+                this.client.sendPacket(new PacketTest(), false);
+
+                System.out.println("Sent: " + d.x + ":" + d.y);
+            }
         }
 
         GL11.glPointSize(5f);
@@ -62,8 +73,8 @@ public class GameWindow implements Runnable {
             GL11.glVertex2f(pn[0], pn[1]);
         }
 
-        GL11.glColor3f(1f, 1f, 1f);
         for(short[] pn : this.points) {
+            GL11.glColor3f(pn[2] / 255f, pn[3] / 255f, pn[4] / 255f);
             GL11.glVertex2f(pn[0], pn[1]);
         }
         GL11.glEnd();
@@ -75,7 +86,7 @@ public class GameWindow implements Runnable {
         while((p = this.client.getProcessedPackets().poll()) != null) {
             if(p instanceof PacketDrawTest) {
                 PacketDrawTest d = ((PacketDrawTest) p);
-                this.points.add(new short[]{d.x, d.y});
+                this.points.add(new short[]{d.x, d.y, (short) (d.r + 127), (short) (d.g + 127), (short) (d.b + 127) });
             }
         }
     }
@@ -149,10 +160,17 @@ public class GameWindow implements Runnable {
 
     private void testInit() {
         try {
-            this.client = new ClientNetcode("piko.ondryaso.eu", 6927, 6928);
+            this.client = new ClientNetcode("localhost", 6927, 6928);
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        Random rnd = new Random();
+        this.r = (byte) (127 - rnd.nextInt(256));
+        this.g = (byte) (127 - rnd.nextInt(256));
+        this.b = (byte) (127 - rnd.nextInt(256));
+
+        this.points.add(0, new short[7]);
 
         GL11.glViewport(0, 0, width, height);
 
@@ -190,7 +208,7 @@ public class GameWindow implements Runnable {
             this.init();
             this.loop();
         } catch (Exception e) {
-            System.out.println(e.getMessage());
+            e.printStackTrace();
         }
 
         this.cleanup();
