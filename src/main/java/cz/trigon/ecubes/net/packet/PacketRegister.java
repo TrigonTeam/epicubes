@@ -9,7 +9,9 @@ public class PacketRegister {
     static {
         PacketRegister.packets = new HashMap<>();
         PacketRegister.pids = new HashMap<>();
+
         PacketRegister.registerPacket(PacketDrawTest.class, (short) 6);
+        PacketRegister.registerPacket(PacketTest.class, (short) 4);
     }
 
     private static Map<Short, Class<? extends Packet>> packets;
@@ -42,7 +44,5 @@ public class PacketRegister {
         } else {
             return null;
         }
-    }/*
-        return new PacketDrawTest(connection);
-    }*/
+    }
 }

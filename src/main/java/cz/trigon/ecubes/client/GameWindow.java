@@ -3,6 +3,7 @@ package cz.trigon.ecubes.client;
 import cz.trigon.ecubes.net.ClientNetcode;
 import cz.trigon.ecubes.net.packet.Packet;
 import cz.trigon.ecubes.net.packet.PacketDrawTest;
+import cz.trigon.ecubes.net.packet.PacketTest;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
@@ -38,20 +39,18 @@ public class GameWindow implements Runnable {
 
     private ClientNetcode client;
 
-    int num = 1;
-    float timePacket;
-
     private void renderTick(float ptt) {
         int mouse = GLFW.glfwGetMouseButton(this.windowHandle, GLFW.GLFW_MOUSE_BUTTON_1);
         if(mouse == 1) {
             DoubleBuffer xpos = BufferUtils.createDoubleBuffer(1);
             DoubleBuffer ypos = BufferUtils.createDoubleBuffer(1);
             GLFW.glfwGetCursorPos(this.windowHandle, xpos, ypos);
-
             this.localPoints.add(new int[] {(int)xpos.get(0), (int)ypos.get(0)});
+
             PacketDrawTest d = new PacketDrawTest((short) xpos.get(0), (short) ypos.get(0));
-            d.timeSent = System.nanoTime();
-            this.client.sendPacketUdp(d);
+            this.client.sendPacket(d, false);
+            this.client.sendPacket(new PacketTest(), false);
+
             System.out.println("Sent: " + d.x + ":" + d.y);
         }
 
@@ -72,13 +71,12 @@ public class GameWindow implements Runnable {
 
     private void tick() {
         Packet p;
+
         while((p = this.client.getProcessedPackets().poll()) != null) {
-            PacketDrawTest d = ((PacketDrawTest)p);
-            float time = (System.nanoTime() - d.timeSent) / 1000000000f;
-            this.timePacket += time;
-            this.num++;
-            System.out.println("Time: " + time + " s");
-            this.points.add(new short[] {d.x, d.y});
+            if(p instanceof PacketDrawTest) {
+                PacketDrawTest d = ((PacketDrawTest) p);
+                this.points.add(new short[]{d.x, d.y});
+            }
         }
     }
 
@@ -96,14 +94,14 @@ public class GameWindow implements Runnable {
         while (time - lastTime >= this.tickTimeSec) {
             this.tick();
 
+            this.ticks++;
             lastTime += this.tickTimeSec;
         }
 
-        if (time - lastInfo >= this.magicConstant) {
-            lastInfo += this.magicConstant;
+        if (this.time - this.lastInfo >= this.magicConstant) {
+            this.lastInfo += this.magicConstant;
             this.fpsCount();
-            lastTicks = ticks;
-            fps = 0;
+            this.fps = 0;
         }
     }
 
@@ -123,7 +121,6 @@ public class GameWindow implements Runnable {
         }
 
         this.cleanup();
-        System.out.println("Avg packet time: " + (this.timePacket / (this.num + 1)) + " ms");
         System.exit(this.shutdownCode);
     }
 
@@ -152,7 +149,7 @@ public class GameWindow implements Runnable {
 
     private void testInit() {
         try {
-            this.client = new ClientNetcode("127.0.0.1", 6927, 6928);
+            this.client = new ClientNetcode("piko.ondryaso.eu", 6927, 6928);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -170,7 +167,7 @@ public class GameWindow implements Runnable {
     }
 
     private void cleanup() {
-
+        this.client.stop();
     }
 
     public void resize(int width, int height) {
@@ -194,7 +191,9 @@ public class GameWindow implements Runnable {
             this.loop();
         } catch (Exception e) {
             System.out.println(e.getMessage());
-            System.exit(this.shutdownCode);
         }
+
+        this.cleanup();
+        System.exit(this.shutdownCode);
     }
 }

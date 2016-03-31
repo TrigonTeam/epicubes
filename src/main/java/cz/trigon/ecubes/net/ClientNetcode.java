@@ -19,67 +19,75 @@ public class ClientNetcode extends Listener {
     private Queue<OutgoingPacketBlob> toProcessOutgoing = new ConcurrentLinkedQueue<>();
 
     private Client client;
+    private Thread processing;
 
     public ClientNetcode(String address, int tcp, int udp) throws IOException {
-        Thread ip = new Thread(this::processIncoming);
-        Thread op = new Thread(this::processOutgoing);
+        this.processing = new Thread(this::process);
 
         this.client = new Client();
         this.client.start();
         this.client.getKryo().register(byte[].class);
-        this.client.connect(100000, address, tcp, udp);
+        this.client.connect(5000, address, tcp, udp);
         this.client.addListener(this);
 
-        ip.start();
-        op.start();
+        this.processing.start();
     }
 
     public Queue<Packet> getProcessedPackets() {
         return this.processedIncoming;
     }
 
-    public void sendPacketUdp(Packet packet) {
-        this.toProcessOutgoing.add(new OutgoingPacketBlob(packet, false));
+    public void stop() {
+        this.processing.interrupt();
+        this.client.stop();
     }
 
-    public void sendPacketTcp(Packet packet) {
-        this.toProcessOutgoing.add(new OutgoingPacketBlob(packet, true));
+    public void sendPacket(Packet packet, boolean tcp) {
+        this.toProcessOutgoing.add(new OutgoingPacketBlob(packet, tcp));
+        try {
+            Thread.sleep(1);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void process() {
+        while (true) {
+            this.processOutgoing();
+            this.processIncoming();
+
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException ignored) {}
+        }
     }
 
     private void processOutgoing() {
         OutgoingPacketBlob b;
 
-        while (!Thread.currentThread().isInterrupted()) {
-            if ((b = this.toProcessOutgoing.poll()) != null) {
-                try {
-                    short id = PacketRegister.getPacketId(b.packet.getClass());
-                    int ids = id << 1;
-
-                    byte[] bytes = b.packet.processOutgoing();
-                    if(bytes.length >= 128) {
-                        bytes = Snappy.compress(bytes);
-                        ids |= 1;
-                    }
-
-                    byte[] withMeta = new byte[bytes.length + 2];
-                    System.arraycopy(bytes, 0, withMeta, 2, bytes.length);
-
-                    withMeta[0] = (byte)(ids & 0xFF);
-                    withMeta[1] = (byte)((ids >> 8) & 0xFF);
-
-                    if (b.tcp) {
-                        this.client.sendTCP(withMeta);
-                    } else {
-                        this.client.sendUDP(withMeta);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
+        while ((b = this.toProcessOutgoing.poll()) != null) {
             try {
-                Thread.sleep(50);
-            } catch (InterruptedException e) {
+                short id = PacketRegister.getPacketId(b.packet.getClass());
+                int ids = id << 1;
+
+                byte[] bytes = b.packet.processOutgoing(false);
+                if (bytes.length >= 128) {
+                    bytes = Snappy.compress(bytes);
+                    ids |= 1;
+                }
+
+                byte[] withMeta = new byte[bytes.length + 2];
+                System.arraycopy(bytes, 0, withMeta, 2, bytes.length);
+
+                withMeta[0] = (byte) (ids & 0xFF);
+                withMeta[1] = (byte) ((ids >> 8) & 0xFF);
+
+                if (b.tcp) {
+                    this.client.sendTCP(withMeta);
+                } else {
+                    this.client.sendUDP(withMeta);
+                }
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -88,35 +96,27 @@ public class ClientNetcode extends Listener {
     private void processIncoming() {
         IncomingPacketBlob b;
 
-        while (!Thread.currentThread().isInterrupted()) {
-            if ((b = this.toProcessIncoming.poll()) != null) {
-                try {
-                    byte[] data = b.rawData;
-
-                    int ids = ((data[0] & 0xFF) | (data[1] << 8) & 0xFFFE);
-                    short id = (short) (ids >> 1);
-
-                    byte[] packetData = new byte[data.length - 2];
-                    Packet p = PacketRegister.createPacket(b.connection, id);
-
-                    if (p != null) {
-                        System.arraycopy(data, 2, packetData, 0, packetData.length);
-
-                        if((data[0] & 1) == 1) {
-                            packetData = Snappy.uncompress(packetData);
-                        }
-
-                        p.processIncoming(packetData);
-                        this.processedIncoming.add(p);
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
+        while ((b = this.toProcessIncoming.poll()) != null) {
             try {
-                Thread.sleep(50);
-            } catch (InterruptedException e) {
+                byte[] data = b.rawData;
+
+                int ids = ((data[0] & 0xFF) | (data[1] << 8) & 0xFFFE);
+                short id = (short) (ids >> 1);
+
+                byte[] packetData = new byte[data.length - 2];
+                Packet p = PacketRegister.createPacket(b.connection, id);
+
+                if (p != null) {
+                    System.arraycopy(data, 2, packetData, 0, packetData.length);
+
+                    if ((data[0] & 1) == 1) {
+                        packetData = Snappy.uncompress(packetData);
+                    }
+
+                    p.processIncoming(packetData, false);
+                    this.processedIncoming.add(p);
+                }
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         }
@@ -125,8 +125,7 @@ public class ClientNetcode extends Listener {
     @Override
     public void received(Connection connection, Object o) {
         if (o instanceof byte[]) {
-            byte[] dataCompressed = (byte[]) o;
-            this.toProcessIncoming.add(new IncomingPacketBlob(connection, dataCompressed));
+            this.toProcessIncoming.add(new IncomingPacketBlob(connection, (byte[]) o));
         }
     }
 

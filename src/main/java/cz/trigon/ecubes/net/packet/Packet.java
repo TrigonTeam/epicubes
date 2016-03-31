@@ -7,12 +7,17 @@ public abstract class Packet {
     protected boolean hasFinished = false;
     protected boolean enabledTcp = true;
     protected boolean enabledUdp = true;
+    protected final boolean received;
+
     protected Connection connection;
 
-    public Packet() { };
+    public Packet() {
+        this.received = false;
+    }
 
     public Packet(Connection connection) {
         this.connection = connection;
+        this.received = true;
     }
 
     public Connection getConnection() {
@@ -31,7 +36,7 @@ public abstract class Packet {
         return this.enabledUdp;
     }
 
-    public abstract void processIncoming(byte[] bytes);
+    public abstract void processIncoming(byte[] bytes, boolean onServer);
 
-    public abstract byte[] processOutgoing();
+    public abstract byte[] processOutgoing(boolean onServer);
 }
