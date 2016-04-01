@@ -8,6 +8,7 @@ import cz.trigon.ecubes.net.packet.PacketRegister;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
@@ -119,6 +120,21 @@ public class ServerNetcode extends Listener {
                         this.server.sendToTCP(b.clientId, withMeta);
                     } else {
                         this.server.sendToUDP(b.clientId, withMeta);
+                    }
+                }
+            } catch (BufferOverflowException e) {
+                System.err.printf("Buffer overflow!");
+                this.toProcessOutgoing.clear();
+
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e1) {
+                    e1.printStackTrace();
+                }
+
+                for(Connection c : this.server.getConnections()) {
+                    if(c.getID() == b.clientId) {
+                        c.close();
                     }
                 }
             } catch (IOException e) {
