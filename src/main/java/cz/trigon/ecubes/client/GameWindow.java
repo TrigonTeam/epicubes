@@ -202,6 +202,7 @@ public class GameWindow implements Runnable {
     private void testInit() {
         try {
             this.client = new ClientNetcode("localhost", 6927, 6928);
+            this.client.connect(3);
         } catch (IOException e) {
             e.printStackTrace();
         }

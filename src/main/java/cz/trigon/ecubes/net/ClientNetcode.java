@@ -20,21 +20,54 @@ public class ClientNetcode extends Listener {
 
     private Client client;
     private Thread processing;
+    private String address;
+    private int tcp, udp;
 
-    public ClientNetcode(String address, int tcp, int udp) throws IOException {
+    public ClientNetcode(String address, int tcp, int udp) {
         this.processing = new Thread(this::process);
+        this.tcp = tcp;
+        this.udp = udp;
+        this.address = address;
 
         this.client = new Client(64000, 64000);
         this.client.start();
         this.client.getKryo().register(byte[].class);
-        this.client.connect(5000, address, tcp, udp);
         this.client.addListener(this);
-
-        this.processing.start();
     }
 
     public Queue<Packet> getProcessedPackets() {
         return this.processedIncoming;
+    }
+
+    public void connect() throws IOException {
+        this.connect(1);
+    }
+
+    public void connect(int times) throws IOException {
+        boolean connected;
+
+        for(int i = 1; i <= times; i++) {
+            try {
+                this.client.connect(5000, this.address, this.tcp, this.udp);
+                break;
+            } catch (Exception e) {
+                System.err.println("Failed to connect (try number " + i + ")");
+                this.client.stop();
+
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e1) {
+                    e1.printStackTrace();
+                }
+
+                this.client.start();
+                if(i == times) {
+                    throw e;
+                }
+            }
+        }
+
+        this.processing.start();
     }
 
     public void stop() {
