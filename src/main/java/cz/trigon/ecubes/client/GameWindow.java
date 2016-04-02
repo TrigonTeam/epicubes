@@ -1,5 +1,9 @@
 package cz.trigon.ecubes.client;
 
+import cz.trigon.ecubes.exception.EpicubesException;
+import cz.trigon.ecubes.exception.ExceptionHandling;
+import cz.trigon.ecubes.exception.ExceptionUtil;
+import cz.trigon.ecubes.log.EpiLogger;
 import cz.trigon.ecubes.net.ClientNetcode;
 import cz.trigon.ecubes.net.packet.*;
 import org.lwjgl.BufferUtils;
@@ -167,7 +171,15 @@ public class GameWindow implements Runnable {
 
         while (GLFW.glfwWindowShouldClose(this.windowHandle) == GL11.GL_FALSE) {
             GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-            this.loopTick();
+            try {
+                this.loopTick();
+            } catch (EpicubesException e) {
+                if(e.getUrgency() == EpicubesException.Urgency.BREAKING) {
+                    throw e;
+                } else if(e.getUrgency() == EpicubesException.Urgency.FEATURE_BREAKING) {
+                    this.handleFeatureException(e);
+                }
+            }
             GLFW.glfwSwapBuffers(this.windowHandle);
             GLFW.glfwPollEvents();
         }
@@ -176,11 +188,17 @@ public class GameWindow implements Runnable {
         System.exit(this.shutdownCode);
     }
 
+    private void handleFeatureException(EpicubesException e) {
+        // TODO
+    }
+
+    @ExceptionHandling(value = "Window", errorCode = 150)
     private void init() {
+        EpiLogger.init(this.getClass());
         GLFW.glfwSetErrorCallback(this.errorCallback = GLFWErrorCallback.createPrint(System.err));
 
         if (GLFW.glfwInit() != GL11.GL_TRUE) {
-            throw new RuntimeException("Couldn't init GLFW.");
+            throw ExceptionUtil.gameBreakingException("Couldn't init GLFW.", this, false);
         }
 
         GLFW.glfwDefaultWindowHints();
@@ -190,9 +208,8 @@ public class GameWindow implements Runnable {
         this.windowHandle = GLFW.glfwCreateWindow(800, 600, "EpiCubes", 0, 0);
 
         if (this.windowHandle == 0) {
-            throw new RuntimeException("Couldn't create window.");
+            throw ExceptionUtil.gameBreakingException("Couldn't create window.", this, false);
         }
-
 
         GLFW.glfwHideWindow(this.windowHandle);
         this.resize(800, 600);
@@ -200,12 +217,8 @@ public class GameWindow implements Runnable {
     }
 
     private void testInit() {
-        try {
-            this.client = new ClientNetcode("localhost", 6927, 6928);
-            this.client.connect(3);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        this.client = new ClientNetcode("localhost", 6927, 6928);
+        this.client.connect(3);
 
         this.r = (byte) (127 - rnd.nextInt(256));
         this.g = (byte) (127 - rnd.nextInt(256));
@@ -255,11 +268,16 @@ public class GameWindow implements Runnable {
         try {
             this.init();
             this.loop();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (EpicubesException e) {
+            this.shutdown(e.getErrorCode());
         }
 
         this.cleanup();
+        if(this.shutdownCode == 0)
+            EpiLogger.info("Shutting down nicely");
+        else
+            EpiLogger.warning("Shutting down with error code " + this.shutdownCode);
+
         System.exit(this.shutdownCode);
     }
 }

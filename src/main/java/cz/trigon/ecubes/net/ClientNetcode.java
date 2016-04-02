@@ -4,6 +4,9 @@ import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import cz.trigon.ecubes.client.GameWindow;
+import cz.trigon.ecubes.exception.ExceptionHandling;
+import cz.trigon.ecubes.exception.ExceptionUtil;
+import cz.trigon.ecubes.log.EpiLogger;
 import cz.trigon.ecubes.net.packet.Packet;
 import cz.trigon.ecubes.net.packet.PacketDrawTest;
 import cz.trigon.ecubes.net.packet.PacketRegister;
@@ -13,6 +16,7 @@ import java.io.IOException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+@ExceptionHandling(value = "Netcode", serverSide = false)
 public class ClientNetcode extends Listener {
     private Queue<IncomingPacketBlob> toProcessIncoming = new ConcurrentLinkedQueue<>();
     private Queue<Packet> processedIncoming = new ConcurrentLinkedQueue<>();
@@ -39,11 +43,11 @@ public class ClientNetcode extends Listener {
         return this.processedIncoming;
     }
 
-    public void connect() throws IOException {
+    public void connect() {
         this.connect(1);
     }
 
-    public void connect(int times) throws IOException {
+    public void connect(int times) {
         boolean connected;
 
         for(int i = 1; i <= times; i++) {
@@ -51,18 +55,16 @@ public class ClientNetcode extends Listener {
                 this.client.connect(5000, this.address, this.tcp, this.udp);
                 break;
             } catch (Exception e) {
-                System.err.println("Failed to connect (try number " + i + ")");
+                EpiLogger.warning("Failed to connect (try number " + i + ")");
                 this.client.stop();
 
                 try {
                     Thread.sleep(100);
-                } catch (InterruptedException e1) {
-                    e1.printStackTrace();
-                }
+                } catch (InterruptedException ignored) {}
 
                 this.client.start();
                 if(i == times) {
-                    throw e;
+                    throw ExceptionUtil.featureBreakingException(e, this, false);
                 }
             }
         }
@@ -121,7 +123,7 @@ public class ClientNetcode extends Listener {
                     this.client.sendUDP(withMeta);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                throw ExceptionUtil.featureBreakingException(e, this, false);
             }
         }
     }
@@ -150,7 +152,7 @@ public class ClientNetcode extends Listener {
                     this.processedIncoming.add(p);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                throw ExceptionUtil.featureBreakingException(e, this, false);
             }
         }
     }

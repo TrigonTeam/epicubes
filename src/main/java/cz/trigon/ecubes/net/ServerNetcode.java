@@ -3,6 +3,9 @@ package cz.trigon.ecubes.net;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
+import cz.trigon.ecubes.exception.ExceptionHandling;
+import cz.trigon.ecubes.exception.ExceptionUtil;
+import cz.trigon.ecubes.log.EpiLogger;
 import cz.trigon.ecubes.net.packet.Packet;
 import cz.trigon.ecubes.net.packet.PacketRegister;
 import org.xerial.snappy.Snappy;
@@ -11,8 +14,8 @@ import java.io.IOException;
 import java.nio.BufferOverflowException;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.Consumer;
 
+@ExceptionHandling("Netcode")
 public class ServerNetcode extends Listener {
 
     private Queue<IncomingPacketBlob> toProcessIncoming = new ConcurrentLinkedQueue<>();
@@ -41,14 +44,14 @@ public class ServerNetcode extends Listener {
 
     @Override
     public void connected(Connection connection) {
-        System.out.println("Connected #" + connection.getID() + ":" +
+        EpiLogger.info("Connected #" + connection.getID() + ":" +
                 connection.getRemoteAddressTCP().getHostName() + "/" +
-                connection.getRemoteAddressTCP().getPort());
+                connection.getRemoteAddressTCP().getPort(), this, "connected");
     }
 
     @Override
     public void disconnected(Connection connection) {
-        System.out.println("Disconnected #" + connection.getID());
+        EpiLogger.info("Disconnected #" + connection.getID(), this, "disconnected");
     }
 
     public Queue<Packet> getProcessedPackets() {
@@ -75,7 +78,8 @@ public class ServerNetcode extends Listener {
 
             try {
                 Thread.sleep(1);
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+            }
         }
     }
 
@@ -89,9 +93,9 @@ public class ServerNetcode extends Listener {
 
                 byte[] bytes = b.packet.processOutgoing(true);
                 if (bytes.length >= 128) {
-                    System.out.println("Previous size: " + bytes.length);
+                    EpiLogger.debug("Previous size: " + bytes.length, this, "processOutgoing");
                     bytes = Snappy.compress(bytes);
-                    System.out.println("Compressed size: " + bytes.length);
+                    EpiLogger.debug("Compressed size: " + bytes.length, this, "processOutgoing");
                     ids |= 1;
                 }
 
@@ -123,22 +127,21 @@ public class ServerNetcode extends Listener {
                     }
                 }
             } catch (BufferOverflowException e) {
-                System.err.printf("Buffer overflow!");
+                EpiLogger.warning("Buffer overflow!", this, "processOutgoing");
                 this.toProcessOutgoing.clear();
 
                 try {
                     Thread.sleep(100);
-                } catch (InterruptedException e1) {
-                    e1.printStackTrace();
+                } catch (InterruptedException ignored) {
                 }
 
-                for(Connection c : this.server.getConnections()) {
-                    if(c.getID() == b.clientId) {
+                for (Connection c : this.server.getConnections()) {
+                    if (c.getID() == b.clientId) {
                         c.close();
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                throw ExceptionUtil.featureBreakingException(e, this, true);
             }
 
         }
@@ -167,7 +170,7 @@ public class ServerNetcode extends Listener {
                     this.processedIncoming.add(p);
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                throw ExceptionUtil.featureBreakingException(e, this, true);
             }
 
         }

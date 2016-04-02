@@ -1,5 +1,6 @@
 package cz.trigon.ecubes.server;
 
+import cz.trigon.ecubes.log.EpiLogger;
 import cz.trigon.ecubes.net.ServerNetcode;
 import cz.trigon.ecubes.net.packet.*;
 
@@ -72,6 +73,7 @@ public class EpiServer implements Runnable {
     public void run() {
         this.time = System.nanoTime();
         this.lastTime = time;
+        EpiLogger.init(this.getClass());
 
         while (true) {
             this.time = System.nanoTime();
