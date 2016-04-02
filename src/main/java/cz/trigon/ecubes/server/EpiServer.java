@@ -1,28 +1,31 @@
 package cz.trigon.ecubes.server;
 
+import cz.trigon.ecubes.exception.EpicubesException;
+import cz.trigon.ecubes.exception.ExceptionUtil;
 import cz.trigon.ecubes.log.EpiLogger;
 import cz.trigon.ecubes.net.ServerNetcode;
 import cz.trigon.ecubes.net.packet.*;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
 
 public class EpiServer implements Runnable {
 
-    protected int tps = 20;
-    protected long time, lastTime, magicConstant = 1000000000;
-    protected double tickTime = 1d / tps;
-    protected double tickTimeSec = this.tickTime * this.magicConstant;
+    private int tps = 20;
+    private long time, lastTime, magicConstant = 1000000000;
+    private double tickTime = 1d / tps;
+    private double tickTimeSec = this.tickTime * this.magicConstant;
+    private int ticks;
+    private int shutdownCode = 0;
+    private boolean run = true;
 
     private ServerNetcode server;
 
-    private List<short[]> points = new ArrayList<>();
-    private final short maxDim = 100;
-
     public EpiServer() throws IOException {
         this.server = new ServerNetcode(6927, 6928);
+    }
+
+    private void init() {
+        EpiLogger.init(this.getClass());
     }
 
     private void tick() {
@@ -32,55 +35,74 @@ public class EpiServer implements Runnable {
                 this.server.sendPacket(p.getConnection().getID(), p, true);
             } else if (p.getId() == 2) {
                 PacketCommand cmd = (PacketCommand) p;
-                if(cmd.getCommand() == 0xAA) {
-                    this.points.clear();
-
-                    for(short x = 0; x < 800; x++) {
-                        for(short y = 0; y < 600; y++) {
-                            this.points.add(new short[] { x, y, 255, 255, 255 });
-                        }
-                    }
-
-                    this.server.sendPacketToAll(new PacketCommand(0xBA), true);
-                } else if(cmd.getCommand() == 0xAB) {
-                    this.points.clear();
-                    this.server.sendPacketToAll(new PacketCommand(0xBA), true);
-                }
-            } else if (p.getId() == 100) {
-                PacketDrawTest d = (PacketDrawTest) p;
-
-                this.points.add(new short[]{d.x, d.y, d.r, d.g, d.b});
-                this.server.sendPacketToAll(p, false);
-            } else if (p.getId() == 101) {
-                PacketHistory req = (PacketHistory) p;
-                this.sendHistory(req);
+                // command logic
             }
         }
     }
 
-    private void sendHistory(PacketHistory req) {
-        PacketHistory h = new PacketHistory(this.points.stream().filter(sh -> (sh[0] >= req.getX()
-                && sh[0] < req.getX() + this.maxDim
-                && sh[1] >= req.getY()
-                && sh[1] < req.getY() + this.maxDim)).collect(Collectors.toList()),
-                (short) (req.getX() + this.maxDim),
-                (short) (req.getY() + this.maxDim));
+    private void handleFeatureException(EpicubesException e) {
 
-        this.server.sendPacket(req.getConnection().getID(), h, true);
+    }
+
+    private void cleanup() {
+
+    }
+
+    private void loop() {
+        this.time = System.nanoTime();
+        this.lastTime = time;
+
+        while (this.run) {
+            try {
+                this.time = System.nanoTime();
+                while (time - lastTime >= this.tickTimeSec) {
+                    this.tick();
+                    this.ticks++;
+                    lastTime += this.tickTimeSec;
+                }
+            } catch (EpicubesException e) {
+                if(e.getUrgency() == EpicubesException.Urgency.BREAKING) {
+                    throw e;
+                } else if(e.getUrgency() == EpicubesException.Urgency.FEATURE_BREAKING) {
+                    this.handleFeatureException(e);
+                }
+            } catch (Exception e) {
+                throw ExceptionUtil.gameBreakingException(e, this, true);
+            }
+        }
+
+        this.endMyLife();
+    }
+
+    public void shutdown(int code) {
+        this.shutdownCode = code;
+        this.run = false;
+    }
+
+    public ServerNetcode getNet() {
+        return this.server;
     }
 
     @Override
     public void run() {
-        this.time = System.nanoTime();
-        this.lastTime = time;
-        EpiLogger.init(this.getClass());
-
-        while (true) {
-            this.time = System.nanoTime();
-            while (time - lastTime >= this.tickTimeSec) {
-                this.tick();
-                lastTime += this.tickTimeSec;
-            }
+        try {
+            this.init();
+            EpiLogger.info("Starting up");
+            this.loop();
+        } catch (EpicubesException e) {
+            this.shutdown(e.getErrorCode());
         }
+
+        this.endMyLife();
+    }
+
+    private void endMyLife() {
+        this.cleanup();
+        if(this.shutdownCode == 0)
+            EpiLogger.info("Shutting down nicely");
+        else
+            EpiLogger.warning("Shutting down with error code " + this.shutdownCode);
+
+        System.exit(this.shutdownCode);
     }
 }

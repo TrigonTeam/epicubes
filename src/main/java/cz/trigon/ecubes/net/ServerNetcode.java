@@ -7,7 +7,7 @@ import cz.trigon.ecubes.exception.ExceptionHandling;
 import cz.trigon.ecubes.exception.ExceptionUtil;
 import cz.trigon.ecubes.log.EpiLogger;
 import cz.trigon.ecubes.net.packet.Packet;
-import cz.trigon.ecubes.net.packet.PacketRegister;
+import cz.trigon.ecubes.net.packet.PacketsRegister;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
@@ -24,9 +24,11 @@ public class ServerNetcode extends Listener {
 
     private Server server;
     private Thread processing;
+    private PacketsRegister preg;
 
     public ServerNetcode(int tcp, int udp) throws IOException {
         this.processing = new Thread(this::process);
+        this.preg = new PacketsRegister();
 
         this.server = new Server(64000, 64000);
         this.server.start();
@@ -40,6 +42,10 @@ public class ServerNetcode extends Listener {
     public void stop() {
         this.processing.interrupt();
         this.server.stop();
+    }
+
+    public PacketsRegister getPacketsRegister() {
+        return this.preg;
     }
 
     @Override
@@ -88,7 +94,7 @@ public class ServerNetcode extends Listener {
 
         while ((b = this.toProcessOutgoing.poll()) != null) {
             try {
-                short id = PacketRegister.getPacketId(b.packet.getClass());
+                short id = this.preg.getPacketId(b.packet.getClass());
                 int ids = id << 1;
 
                 byte[] bytes = b.packet.processOutgoing(true);
@@ -157,7 +163,7 @@ public class ServerNetcode extends Listener {
                 short id = (short) (ids >> 1);
 
                 byte[] packetData = new byte[data.length - 2];
-                Packet p = PacketRegister.createPacket(b.connection, id);
+                Packet p = this.preg.createPacket(b.connection, id);
 
                 if (p != null) {
                     System.arraycopy(data, 2, packetData, 0, packetData.length);

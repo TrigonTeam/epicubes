@@ -14,13 +14,12 @@ public abstract class Packet {
 
     public Packet() {
         this.received = false;
-        this.id = PacketRegister.getPacketId(this.getClass());
     }
 
-    public Packet(Connection connection) {
+    public Packet(Connection connection, int id) {
         this.connection = connection;
         this.received = true;
-        this.id = PacketRegister.getPacketId(this.getClass());
+        this.id = id;
     }
 
     public int getId() {

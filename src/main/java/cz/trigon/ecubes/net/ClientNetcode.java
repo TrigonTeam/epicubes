@@ -3,13 +3,11 @@ package cz.trigon.ecubes.net;
 import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
-import cz.trigon.ecubes.client.GameWindow;
 import cz.trigon.ecubes.exception.ExceptionHandling;
 import cz.trigon.ecubes.exception.ExceptionUtil;
 import cz.trigon.ecubes.log.EpiLogger;
 import cz.trigon.ecubes.net.packet.Packet;
-import cz.trigon.ecubes.net.packet.PacketDrawTest;
-import cz.trigon.ecubes.net.packet.PacketRegister;
+import cz.trigon.ecubes.net.packet.PacketsRegister;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
@@ -26,17 +24,23 @@ public class ClientNetcode extends Listener {
     private Thread processing;
     private String address;
     private int tcp, udp;
+    private PacketsRegister preg;
 
     public ClientNetcode(String address, int tcp, int udp) {
         this.processing = new Thread(this::process);
         this.tcp = tcp;
         this.udp = udp;
         this.address = address;
+        this.preg = new PacketsRegister();
 
         this.client = new Client(64000, 64000);
         this.client.start();
         this.client.getKryo().register(byte[].class);
         this.client.addListener(this);
+    }
+
+    public PacketsRegister getPacketsRegister() {
+        return this.preg;
     }
 
     public Queue<Packet> getProcessedPackets() {
@@ -102,7 +106,7 @@ public class ClientNetcode extends Listener {
 
         while ((b = this.toProcessOutgoing.poll()) != null) {
             try {
-                short id = PacketRegister.getPacketId(b.packet.getClass());
+                short id = this.preg.getPacketId(b.packet.getClass());
                 int ids = id << 1;
 
                 byte[] bytes = b.packet.processOutgoing(false);
@@ -139,7 +143,7 @@ public class ClientNetcode extends Listener {
                 short id = (short) (ids >> 1);
 
                 byte[] packetData = new byte[data.length - 2];
-                Packet p = PacketRegister.createPacket(b.connection, id);
+                Packet p = this.preg.createPacket(b.connection, id);
 
                 if (p != null) {
                     System.arraycopy(data, 2, packetData, 0, packetData.length);
