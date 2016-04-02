@@ -11,7 +11,7 @@ public class PacketsRegister {
         this.pids = new HashMap<>();
 
         this.registerPacket(PacketMeasurePing.class, (short) 1);
-        this.registerPacket(PacketCommand.class, (short) 2);
+        this.registerPacket(PacketControl.class, (short) 2);
     }
 
     private Map<Short, Class<? extends Packet>> packets;

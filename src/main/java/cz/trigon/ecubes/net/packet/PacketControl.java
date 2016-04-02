@@ -3,15 +3,14 @@ package cz.trigon.ecubes.net.packet;
 import com.esotericsoftware.kryonet.Connection;
 import cz.trigon.ecubes.util.NumberPacker;
 
-public class PacketCommand extends Packet {
-
+public class PacketControl extends Packet {
     protected int command;
 
-    public PacketCommand(Connection connection, int id) {
+    public PacketControl(Connection connection, int id) {
         super(connection, id);
     }
 
-    public PacketCommand(int command) {
+    public PacketControl(int command) {
         super();
         this.command = command;
     }

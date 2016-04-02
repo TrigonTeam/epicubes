@@ -34,7 +34,7 @@ public class EpiServer implements Runnable {
             if (p.getId() == 1) {
                 this.server.sendPacket(p.getConnection().getID(), p, true);
             } else if (p.getId() == 2) {
-                PacketCommand cmd = (PacketCommand) p;
+                PacketControl cmd = (PacketControl) p;
                 // command logic
             }
         }
