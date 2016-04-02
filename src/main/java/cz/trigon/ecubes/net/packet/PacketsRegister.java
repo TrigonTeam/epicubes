@@ -10,9 +10,6 @@ public class PacketsRegister {
         this.packets = new HashMap<>();
         this.pids = new HashMap<>();
 
-        this.registerPacket(PacketDrawTest.class, (short) 100);
-        this.registerPacket(PacketHistory.class, (short) 101);
-
         this.registerPacket(PacketMeasurePing.class, (short) 1);
         this.registerPacket(PacketCommand.class, (short) 2);
     }

@@ -97,7 +97,9 @@ public class GameWindow implements Runnable {
         GLFW.glfwDefaultWindowHints();
         GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GL11.GL_FALSE);
         GLFW.glfwWindowHint(GLFW.GLFW_SAMPLES, 4);
-
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3);
+        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 0);
+        
         this.windowHandle = GLFW.glfwCreateWindow(800, 600, "EpiCubes", 0, 0);
 
         if (this.windowHandle == 0) {

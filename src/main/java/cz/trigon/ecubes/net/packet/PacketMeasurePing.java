@@ -7,8 +7,8 @@ public class PacketMeasurePing extends Packet {
     private int timeMs = 0;
     private int pingMs;
 
-    public PacketMeasurePing(Connection connection) {
-        super(connection);
+    public PacketMeasurePing(Connection connection, int id) {
+        super(connection, id);
     }
 
     public PacketMeasurePing() {

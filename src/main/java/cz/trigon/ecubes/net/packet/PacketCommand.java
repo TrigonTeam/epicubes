@@ -7,8 +7,8 @@ public class PacketCommand extends Packet {
 
     protected int command;
 
-    public PacketCommand(Connection connection) {
-        super(connection);
+    public PacketCommand(Connection connection, int id) {
+        super(connection, id);
     }
 
     public PacketCommand(int command) {
